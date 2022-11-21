@@ -1,0 +1,345 @@
+version: '3.7'
+
+networks:
+  mimir-net:
+    driver: bridge
+
+services:
+  minio:
+    image: minio/minio:RELEASE.2021-07-15T22-27-34Z
+    command: server /data --console-address ":9001"
+    restart: always
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - "blockstorage:/data"
+    networks:
+      - mimir-net
+  createbuckets:
+    image: minio/mc
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set myminio http://minio:9000 minioadmin minioadmin;
+      /usr/bin/mc mb myminio/mimir-block-docker;
+      /usr/bin/mc policy set public myminio/mimir-block-docker;
+      /usr/bin/mc mb myminio/mimir-block-ruler;
+      /usr/bin/mc policy set public myminio/mimir-block-ruler;
+      /usr/bin/mc mb myminio/mimir-alert;
+      /usr/bin/mc policy set public myminio/mimir-alert;
+      exit 0;"
+    networks:
+      - mimir-net
+  consul-server:
+    image: consul:1.11
+    restart: always
+    ports:
+      - "8600:8600/udp"
+      - "8500:8500"
+      - "8300:8300"
+      - "8301:8301"
+      - "8302:8302"
+    volumes:
+      - "./consul/:/opt/"
+    command: "agent -server -bootstrap -ui -config-dir=/opt/ --bind=127.0.0.1"
+    networks:
+      - mimir-net
+  jaeger:
+    image: jaegertracing/all-in-one:1.33
+    environment:
+      COLLECTOR_ZIPKIN_HOST_PORT: 9411
+    ports:
+      - "16686:16686"
+      - "9411:9411"
+      - "14268:14268"
+      - "14250:14250"
+    networks:
+      - mimir-net
+  jaeger-agent:
+    image: jaegertracing/jaeger-agent:1.33
+    environment:
+      REPORTER_GRPC_HOST_PORT: "jaeger:14250"
+    ports:
+      - "6831:6831/udp"
+      - "6832:6832/udp"
+      - "5778:5778/tcp"
+      - "5775:5775/udp"
+      - "14271:14271"
+    networks:
+      - mimir-net
+  mimir_distributor:
+    image: grafana/mimir:2.3.1
+    restart: on-failure
+    ports:
+      - "8800:8800"
+      - "9900:9900"
+      - "7947:7947"
+    volumes: 
+      - "./mimir.yml:/etc/mimir.yml"
+    command: "-target=distributor 
+            -config.file=/etc/mimir.yml 
+            -server.http-listen-port=8800 
+            -server.grpc-listen-port=9900"
+    networks:
+      - mimir-net
+    environment:
+      JAEGER_AGENT_HOST: jaeger-agent
+  mimir_ingester-1:
+    image: grafana/mimir:2.3.1
+    restart: on-failure
+    ports:
+      - "13100:13100"
+      - "23100:23100"
+      - "7946:7946"
+    volumes: 
+      - "./mimir.yml:/etc/mimir.yml"
+      - "ingester-v1:/tsdb"
+    command: "-target=ingester 
+            -config.file=/etc/mimir.yml 
+            -server.http-listen-port=13100 
+            -server.grpc-listen-port=23100
+            -memberlist.bind-port=7946"
+    depends_on:
+        - mimir_distributor
+    networks:
+      - mimir-net
+    environment:
+      JAEGER_AGENT_HOST: jaeger-agent
+  mimir_ingester-2:
+    image: grafana/mimir:2.3.1
+    restart: on-failure
+    ports:
+      - "13200:13200"
+      - "23200:23200"
+      - "7945:7945"
+    volumes: 
+      - "./mimir.yml:/etc/mimir.yml"
+      - "ingester-v2:/tsdb"
+    command: "-target=ingester
+            -config.file=/etc/mimir.yml 
+            -server.http-listen-port=13200 
+            -server.grpc-listen-port=23200
+            -memberlist.bind-port=7945"
+    depends_on:
+        - mimir_distributor
+    networks:
+      - mimir-net
+    environment:
+      JAEGER_AGENT_HOST: jaeger-agent
+  mimir_ingester-3:
+    image: grafana/mimir:2.3.1 
+    restart: on-failure
+    ports:
+      - "13300:13300"
+      - "23300:23300"
+      - "7944:7944"
+    volumes: 
+      - "./mimir.yml:/etc/mimir.yml"
+      - "ingester-v3:/tsdb"
+    command: "-target=ingester 
+            -config.file=/etc/mimir.yml 
+            -server.http-listen-port=13300 
+            -server.grpc-listen-port=23300
+            -memberlist.bind-port=7944"
+    depends_on:
+        - mimir_distributor
+    networks:
+      - mimir-net
+    environment:
+      JAEGER_AGENT_HOST: jaeger-agent
+  mimir_frontend:
+    image: grafana/mimir:2.3.1
+    restart: on-failure
+    ports:
+      - "8880:8880"
+      - "28800:28800"
+    volumes: 
+      - "./mimir.yml:/etc/mimir.yml"
+    command: "-target=query-frontend 
+            -config.file=/etc/mimir.yml 
+            -server.http-listen-port=8880 
+            -server.grpc-listen-port=28800"
+    depends_on:
+        - mimir_querier-1
+        - mimir_querier-2
+    networks:
+      - mimir-net
+    environment:
+      JAEGER_AGENT_HOST: jaeger-agent
+  mimir_querier-1:
+    image: grafana/mimir:2.3.1
+    restart: on-failure
+    ports:
+      - "11221:11221"
+      - "21221:21221"
+    volumes: 
+      - "./mimir.yml:/etc/mimir.yml"
+    command: "-target=querier
+            -config.file=/etc/mimir.yml 
+            -server.http-listen-port=11221 
+            -server.grpc-listen-port=21221"
+    depends_on:
+        - mimir_store_gateway-1
+        - mimir_store_gateway-2
+    networks:
+      - mimir-net
+    environment:
+      JAEGER_AGENT_HOST: jaeger-agent
+  mimir_querier-2:
+    image: grafana/mimir:2.3.1
+    restart: on-failure
+    ports:
+      - "11222:11222"
+      - "21222:21222"
+    volumes: 
+      - "./mimir.yml:/etc/mimir.yml"
+    command: "-target=querier
+            -config.file=/etc/mimir.yml 
+            -server.http-listen-port=11222 
+            -server.grpc-listen-port=21222"
+    depends_on:
+        - mimir_store_gateway-1
+        - mimir_store_gateway-2
+    networks:
+      - mimir-net
+    environment:
+      JAEGER_AGENT_HOST: jaeger-agent
+  mimir_compactor:
+    image: grafana/mimir:2.3.1
+    restart: on-failure
+    ports:
+      - "14000:14000"
+      - "24000:24000"
+    volumes: 
+      - "./mimir.yml:/etc/mimir.yml"
+    command: "-target=compactor
+            -config.file=/etc/mimir.yml 
+            -server.http-listen-port=14000 
+            -server.grpc-listen-port=24000"
+    depends_on:
+        - mimir_distributor
+    networks:
+      - mimir-net
+    environment:
+      JAEGER_AGENT_HOST: jaeger-agent
+  mimir_store_gateway-1:
+    image: grafana/mimir:2.3.1
+    restart: on-failure
+    ports:
+      - "14100:14100"
+      - "24100:24100"
+    volumes: 
+      - "./mimir.yml:/etc/mimir.yml"
+    command: "-target=store-gateway
+            -config.file=/etc/mimir.yml 
+            -server.http-listen-port=14100 
+            -server.grpc-listen-port=24100"
+    networks:
+      - mimir-net
+    environment:
+      JAEGER_AGENT_HOST: jaeger-agent
+  mimir_store_gateway-2:
+    image: grafana/mimir:2.3.1
+    restart: on-failure
+    ports:
+      - "14200:14200"
+      - "24200:24200"
+    volumes: 
+      - "./mimir.yml:/etc/mimir.yml"
+    command: "-target=store-gateway
+            -config.file=/etc/mimir.yml 
+            -server.http-listen-port=14200 
+            -server.grpc-listen-port=24200"
+    networks:
+      - mimir-net
+    environment:
+      JAEGER_AGENT_HOST: jaeger-agent
+  mimir_ruler:
+    image: grafana/mimir:2.3.1
+    restart: on-failure
+    ports:
+      - "15000:15000"
+      - "25000:25000"
+    volumes: 
+      - "./mimir.yml:/etc/mimir.yml"
+    command: "-target=ruler
+            -config.file=/etc/mimir.yml 
+            -server.http-listen-port=15000 
+            -server.grpc-listen-port=25000"
+    networks:
+      - mimir-net
+    environment:
+      JAEGER_AGENT_HOST: jaeger-agent
+  mimir_alertmanager:
+    image: grafana/mimir:2.3.1
+    restart: on-failure
+    ports:
+      - "15100:15100"
+      - "25100:25100"
+    volumes: 
+      - "./mimir.yml:/etc/mimir.yml"
+    command: "-target=alertmanager
+            -config.file=/etc/mimir.yml 
+            -server.http-listen-port=15100 
+            -server.grpc-listen-port=25100
+            -alertmanager.web.external-url=http://localhost:15100/alertmanager"
+    depends_on:
+        - mimir_ruler
+    networks:
+      - mimir-net
+    environment:
+      JAEGER_AGENT_HOST: jaeger-agent
+  prometheus-1:
+    image: prom/prometheus:v2.33.1
+    ports:
+      - "9090:9090"
+    volumes:
+      - prometheus_data-1:/prometheus
+      - ./prometheus1.yml:/etc/prometheus/prometheus1.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus1.yml'
+    depends_on:
+        - consul-server
+    networks:
+      - mimir-net
+  prometheus-2:
+    image: prom/prometheus:v2.33.1
+    ports:
+      - "9080:9090"
+    volumes:
+      - prometheus_data-2:/prometheus
+      - ./prometheus2.yml:/etc/prometheus/prometheus2.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus2.yml'
+    depends_on:
+        - consul-server
+    networks:
+      - mimir-net
+  grafana:
+    image: grafana/grafana:8.0.2
+    depends_on:
+        - prometheus-1
+        - prometheus-2
+    ports:
+        - "3000:3000"
+    volumes:
+        - "./datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml"
+        - "./datasources2.yml:/etc/grafana/provisioning/datasources/datasources2.yml"
+    networks:
+      - mimir-net
+
+volumes:
+  blockstorage:
+    driver: local
+  ingester-v1:
+    driver: local
+  ingester-v2:
+    driver: local
+  ingester-v3:
+    driver: local
+  prometheus_data-1:
+    driver: local
+  prometheus_data-2:
+    driver: local
