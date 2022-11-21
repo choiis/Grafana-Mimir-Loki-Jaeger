@@ -20,8 +20,8 @@ docker-compose up
 * You can access Mimir distributor admin console at http://localhost:8800/
 ![Mimir Admin UI](http://imageresizer-dev-serverlessdeploymentbucket-xapz1q6q9exe.s3-website-ap-northeast-1.amazonaws.com/gitpng/mimir_console.PNG)
 
-* You can check remote writing metric targets Mimir admin console at http:http://localhost:8800/distributor/all_user_stats
-![Mimir User UI](https://imageresizer-dev-serverlessdeploymentbucket-xapz1q6q9exe.s3-website-ap-northeast-1.amazonaws.com/gitpng/mimir_user.PNG)
+* You can check remote writing metric targets Mimir admin console at http://localhost:8800/distributor/all_user_stats
+![Mimir User UI](http://imageresizer-dev-serverlessdeploymentbucket-xapz1q6q9exe.s3-website-ap-northeast-1.amazonaws.com/gitpng/mimir_user.PNG)
 
 * You can view the configuration services of Mimir MSA at http://localhost:8800/memberlist
 ![Mimir member UI](http://imageresizer-dev-serverlessdeploymentbucket-xapz1q6q9exe.s3-website-ap-northeast-1.amazonaws.com/gitpng/mimir_components.PNG)
