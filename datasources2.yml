@@ -1,0 +1,15 @@
+apiVersion: 1
+
+datasources:
+  - name: Mimir-Docker
+    type: prometheus
+    access: proxy
+    orgId: 1
+    url: http://mimir_frontend:8880/api/prom
+    isDefault:
+    version: 1
+    editable: true
+    jsonData:
+      httpHeaderName1: 'X-Scope-OrgId'
+    secureJsonData:
+      httpHeaderValue1: 'mimir'

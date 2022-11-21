@@ -1,0 +1,24 @@
+global:
+  scrape_interval:     15s # By default, scrape targets every 15 seconds.
+  evaluation_interval: 15s # By default, scrape targets every 15 seconds.
+  # scrape_timeout is set to the global default (10s).
+
+# Let's scrape every Jaeger service:
+scrape_configs:
+  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
+  - job_name: 'prometheus'
+    # metrics_path defaults to '/metrics'
+    # scheme defaults to 'http'.=
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['localhost:9090']
+
+remote_write:
+  - url: http://mimir_distributor:18180/api/v1/push
+    headers:
+      X-Scope-OrgId: prom
+    queue_config:
+      capacity: 5000
+      max_shards: 20
+      min_shards: 5
+      max_samples_per_send: 1000

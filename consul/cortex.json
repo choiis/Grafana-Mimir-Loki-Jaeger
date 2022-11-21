@@ -1,0 +1,132 @@
+{
+    "services": [{
+        "name": "distributor",
+        "tags": ["mimir", "distributor"],
+        "port": 8800,
+        "check": {
+            "name": "Distributor Ready",
+            "http": "http://mimir_distributor:8800/ready",
+            "interval": "5s",
+            "timeout": "2s"
+        }
+    }, {
+        "name": "query-frontend",
+        "tags": ["mimir", "query-frontend"],
+        "port": 8880,
+        "check": {
+            "name": "Query-Frontend Ready",
+            "http": "http://mimir_frontend:8880/ready",
+            "interval": "5s",
+            "timeout": "2s"
+        }
+    }, {
+        "id": "querier-1",
+        "name": "querier",
+        "tags": ["mimir", "querier"],
+        "port": 11221,
+        "check": {
+            "name": "Querier Ready",
+            "http": "http://mimir_querier-1:11221/ready",
+            "interval": "5s",
+            "timeout": "2s"
+        }
+    }, {
+        "id": "querier-2",
+        "name": "querier",
+        "tags": ["mimir", "querier"],
+        "port": 11222,
+        "check": {
+            "name": "Querier Ready",
+            "http": "http://mimir_querier-2:11222/ready",
+            "interval": "5s",
+            "timeout": "2s"
+        }
+    }, {
+        "id": "ingester-1",
+        "name": "ingester",
+        "tags": ["mimir", "ingester"],
+        "port": 13100,
+        "check": {
+            "name": "Ingester Ready",
+            "http": "http://mimir_ingester-1:13100/ready",
+            "interval": "5s",
+            "timeout": "2s"
+        }
+    }, {
+        "id": "ingester-2",
+        "name": "ingester",
+        "tags": ["mimir", "ingester"],
+        "port": 13200,
+        "check": {
+            "name": "Ingester Ready",
+            "http": "http://mimir_ingester-2:13200/ready",
+            "interval": "5s",
+            "timeout": "2s"
+        }
+    }, {
+        "id": "ingester-3",
+        "name": "ingester",
+        "tags": ["mimir", "ingester"],
+        "port": 13300,
+        "check": {
+            "name": "Ingester Ready",
+            "http": "http://mimir_ingester-3:13300/ready",
+            "interval": "5s",
+            "timeout": "2s"
+        }
+    }, {
+        "name": "compactor",
+        "tags": ["mimir", "compactor"],
+        "port": 14000,
+        "check": {
+            "name": "Compactor Ready",
+            "http": "http://mimir_compactor:14000/ready",
+            "interval": "5s",
+            "timeout": "3s"
+        }
+    }, {
+        "id": "store-gateway-1",
+        "name": "store-gateway",
+        "tags": ["mimir", "store-gateway"],
+        "port": 14100,
+        "check": {
+            "name": "Store-gateway Ready",
+            "http": "http://mimir_store_gateway-1:14100/ready",
+            "interval": "5s",
+            "timeout": "3s"
+        }
+    }, {
+        "id": "store-gateway-2",
+        "name": "store-gateway",
+        "tags": ["mimir", "store-gateway"],
+        "port": 14200,
+        "check": {
+            "name": "Store-gateway Ready",
+            "http": "http://mimir_store_gateway-2:14200/ready",
+            "interval": "5s",
+            "timeout": "3s"
+        }
+    }, {
+        "id": "ruler",
+        "name": "ruler",
+        "tags": ["mimir", "ruler"],
+        "port": 14200,
+        "check": {
+            "name": "ruler Ready",
+            "http": "http://mimir_ruler:15000/ready",
+            "interval": "5s",
+            "timeout": "3s"
+        }
+    }, {
+        "id": "alertmanager",
+        "name": "alertmanager",
+        "tags": ["mimir", "alertmanager"],
+        "port": 15100,
+        "check": {
+            "name": "alertmanager Ready",
+            "http": "http://mimir_alertmanager:15100/ready",
+            "interval": "5s",
+            "timeout": "3s"
+        }
+    }]
+}

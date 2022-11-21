@@ -1,0 +1,14 @@
+{
+  "datacenter": "tcc1",
+  "ports": {
+    "http": 8500
+  },
+  "enable_local_script_checks": true,
+  "log_file":"/consul/log",
+  "log_rotate_bytes": 10485760,
+  "log_rotate_max_files": 60,
+  "data_dir":"/consul/data",
+  "log_level": "info",
+  "log_json": true
+}
+

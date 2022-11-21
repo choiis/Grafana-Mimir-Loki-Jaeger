@@ -1,0 +1,119 @@
+activity_tracker:
+    filepath: ./active-query-tracker
+alertmanager:
+    data_dir: data/
+    enable_api: true
+alertmanager_storage:
+    backend: s3
+    s3:
+        access_key_id: minioadmin
+        bucket_name: mimir-alert
+        endpoint: minio:9000
+        insecure: true
+        region: docker
+        secret_access_key: minioadmin
+api:
+    prometheus_http_prefix: /api/prom
+blocks_storage:
+    backend: s3
+    filesystem:
+        dir: ""
+    s3:
+        access_key_id: minioadmin
+        bucket_name: mimir-block-docker
+        endpoint: minio:9000
+        http:
+            max_idle_connections: 10
+            max_idle_connections_per_host: 5
+        insecure: true
+        region: docker
+        secret_access_key: minioadmin
+    tsdb:
+        block_ranges_period:
+            - 10m0s
+compactor:
+    block_ranges:
+        - 10m0s
+    data_dir: ./data
+    sharding_ring:
+        kvstore:
+            store: memberlist
+distributor:
+    ha_tracker:
+        enable_ha_tracker: false
+    pool:
+        client_cleanup_period: 15s
+        health_check_ingesters: true
+    ring:
+        kvstore:
+            store: memberlist
+frontend:
+    cache_results: false
+    log_queries_longer_than: 4s
+frontend_worker:
+    frontend_address: mimir_frontend:28800
+ingester:
+    ring:
+        final_sleep: 5s
+        instance_interface_names:
+            - eth0
+            - eth1
+        kvstore:
+            store: memberlist
+        num_tokens: 128
+        observe_period: 10s
+        replication_factor: 2
+        tokens_file_path: tokens
+        unregister_on_shutdown: false
+ingester_client:
+    grpc_client_config:
+        max_recv_msg_size: 104857600
+        max_send_msg_size: 104857600
+memberlist:
+    bind_addr:
+        - 0.0.0.0
+    bind_port: 7946
+    join_members:
+        - mimir_ingester-1:7946
+        - mimir_ingester-2:7945
+        - mimir_ingester-3:7944
+    pull_push_interval: 10s
+    rejoin_interval: 5m0s
+multitenancy_enabled: true
+querier:
+    max_concurrent: 100
+ruler:
+    alertmanager_url: http://mimir_alertmanager:18482/alertmanager
+    enable_api: true
+    evaluation_interval: 1m0s
+    poll_interval: 5m0s
+    resend_delay: 3h0m0s
+    ring:
+        instance_interface_names:
+            - eth0
+            - eth1
+        kvstore:
+            store: memberlist
+        num_tokens: 64
+    rule_path: rules
+ruler_storage:
+    backend: s3
+    filesystem:
+        dir: ""
+    s3:
+        access_key_id: minioadmin
+        bucket_name: mimir-block-ruler
+        endpoint: minio:9000
+        http:
+            max_idle_connections: 10
+            max_idle_connections_per_host: 5
+        insecure: true
+        region: docker
+        secret_access_key: minioadmin
+server:
+    http_listen_port: 80
+store_gateway:
+    sharding_ring:
+        kvstore:
+            store: memberlist
+        replication_factor: 2

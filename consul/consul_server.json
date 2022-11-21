@@ -1,0 +1,12 @@
+{
+  "server": true,
+  "bootstrap_expect": 1,
+  "client_addr": "0.0.0.0",
+  "ui_config": {
+    "enabled": true
+  },
+  "telemetry": {
+    "disable_compat_1.9": true,
+    "prometheus_retention_time": "2m"
+  }
+}
