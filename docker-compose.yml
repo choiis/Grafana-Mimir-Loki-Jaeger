@@ -16,6 +16,10 @@ services:
       - "blockstorage:/data"
     networks:
       - mimir-net
+    logging:
+      driver: loki
+      options:
+        loki-url: http://localhost:3100/loki/api/v1/push
   createbuckets:
     image: minio/mc
     depends_on:
@@ -46,6 +50,21 @@ services:
     command: "agent -server -bootstrap -ui -config-dir=/opt/ --bind=127.0.0.1"
     networks:
       - mimir-net
+    logging:
+      driver: loki
+      options:
+        loki-url: http://localhost:3100/loki/api/v1/push
+  loki:
+    image: grafana/loki:2.2.1
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+    - "3100:3100"
+    networks:
+      - mimir-net
+    logging:
+      driver: loki
+      options:
+        loki-url: http://localhost:3100/loki/api/v1/push
   jaeger:
     image: jaegertracing/all-in-one:1.33
     environment:
@@ -57,6 +76,10 @@ services:
       - "14250:14250"
     networks:
       - mimir-net
+    logging:
+      driver: loki
+      options:
+        loki-url: http://localhost:3100/loki/api/v1/push
   jaeger-agent:
     image: jaegertracing/jaeger-agent:1.33
     environment:
@@ -69,6 +92,10 @@ services:
       - "14271:14271"
     networks:
       - mimir-net
+    logging:
+      driver: loki
+      options:
+        loki-url: http://localhost:3100/loki/api/v1/push
   mimir_distributor:
     image: grafana/mimir:2.3.1
     restart: on-failure
@@ -86,6 +113,10 @@ services:
       - mimir-net
     environment:
       JAEGER_AGENT_HOST: jaeger-agent
+    logging:
+      driver: loki
+      options:
+        loki-url: http://localhost:3100/loki/api/v1/push
   mimir_ingester-1:
     image: grafana/mimir:2.3.1
     restart: on-failure
@@ -107,6 +138,10 @@ services:
       - mimir-net
     environment:
       JAEGER_AGENT_HOST: jaeger-agent
+    logging:
+      driver: loki
+      options:
+        loki-url: http://localhost:3100/loki/api/v1/push
   mimir_ingester-2:
     image: grafana/mimir:2.3.1
     restart: on-failure
@@ -128,6 +163,10 @@ services:
       - mimir-net
     environment:
       JAEGER_AGENT_HOST: jaeger-agent
+    logging:
+      driver: loki
+      options:
+        loki-url: http://localhost:3100/loki/api/v1/push
   mimir_ingester-3:
     image: grafana/mimir:2.3.1 
     restart: on-failure
@@ -149,6 +188,10 @@ services:
       - mimir-net
     environment:
       JAEGER_AGENT_HOST: jaeger-agent
+    logging:
+      driver: loki
+      options:
+        loki-url: http://localhost:3100/loki/api/v1/push
   mimir_frontend:
     image: grafana/mimir:2.3.1
     restart: on-failure
@@ -168,6 +211,10 @@ services:
       - mimir-net
     environment:
       JAEGER_AGENT_HOST: jaeger-agent
+    logging:
+      driver: loki
+      options:
+        loki-url: http://localhost:3100/loki/api/v1/push
   mimir_querier-1:
     image: grafana/mimir:2.3.1
     restart: on-failure
@@ -187,6 +234,10 @@ services:
       - mimir-net
     environment:
       JAEGER_AGENT_HOST: jaeger-agent
+    logging:
+      driver: loki
+      options:
+        loki-url: http://localhost:3100/loki/api/v1/push
   mimir_querier-2:
     image: grafana/mimir:2.3.1
     restart: on-failure
@@ -206,6 +257,10 @@ services:
       - mimir-net
     environment:
       JAEGER_AGENT_HOST: jaeger-agent
+    logging:
+      driver: loki
+      options:
+        loki-url: http://localhost:3100/loki/api/v1/push
   mimir_compactor:
     image: grafana/mimir:2.3.1
     restart: on-failure
@@ -224,6 +279,10 @@ services:
       - mimir-net
     environment:
       JAEGER_AGENT_HOST: jaeger-agent
+    logging:
+      driver: loki
+      options:
+        loki-url: http://localhost:3100/loki/api/v1/push
   mimir_store_gateway-1:
     image: grafana/mimir:2.3.1
     restart: on-failure
@@ -240,6 +299,10 @@ services:
       - mimir-net
     environment:
       JAEGER_AGENT_HOST: jaeger-agent
+    logging:
+      driver: loki
+      options:
+        loki-url: http://localhost:3100/loki/api/v1/push
   mimir_store_gateway-2:
     image: grafana/mimir:2.3.1
     restart: on-failure
@@ -256,6 +319,10 @@ services:
       - mimir-net
     environment:
       JAEGER_AGENT_HOST: jaeger-agent
+    logging:
+      driver: loki
+      options:
+        loki-url: http://localhost:3100/loki/api/v1/push
   mimir_ruler:
     image: grafana/mimir:2.3.1
     restart: on-failure
@@ -272,6 +339,10 @@ services:
       - mimir-net
     environment:
       JAEGER_AGENT_HOST: jaeger-agent
+    logging:
+      driver: loki
+      options:
+        loki-url: http://localhost:3100/loki/api/v1/push
   mimir_alertmanager:
     image: grafana/mimir:2.3.1
     restart: on-failure
@@ -291,6 +362,10 @@ services:
       - mimir-net
     environment:
       JAEGER_AGENT_HOST: jaeger-agent
+    logging:
+      driver: loki
+      options:
+        loki-url: http://localhost:3100/loki/api/v1/push
   prometheus-1:
     image: prom/prometheus:v2.33.1
     ports:
@@ -304,6 +379,10 @@ services:
         - consul-server
     networks:
       - mimir-net
+    logging:
+      driver: loki
+      options:
+        loki-url: http://localhost:3100/loki/api/v1/push
   prometheus-2:
     image: prom/prometheus:v2.33.1
     ports:
@@ -317,6 +396,10 @@ services:
         - consul-server
     networks:
       - mimir-net
+    logging:
+      driver: loki
+      options:
+        loki-url: http://localhost:3100/loki/api/v1/push
   grafana:
     image: grafana/grafana:8.0.2
     depends_on:
@@ -325,8 +408,10 @@ services:
     ports:
         - "3000:3000"
     volumes:
+        - grafana-data:/var/lib/grafana
         - "./datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml"
         - "./datasources2.yml:/etc/grafana/provisioning/datasources/datasources2.yml"
+        - "./datasources3.yml:/etc/grafana/provisioning/datasources/datasources3.yml"
     networks:
       - mimir-net
 
@@ -342,4 +427,6 @@ volumes:
   prometheus_data-1:
     driver: local
   prometheus_data-2:
+    driver: local
+  grafana-data:
     driver: local

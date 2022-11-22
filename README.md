@@ -7,7 +7,12 @@
 
 ### Execution
 
-* Before running docker compose, open /consul/cortex.json file and change all address configurations to your local IP.
+* Before running docker compose, open /consul/mimir.json file and change all address configurations to your local IP.
+
+* Install Loki docker driver
+```
+docker plugin install grafana/loki-docker-driver:latest --alias loki --grant-all-permissions
+```
 
 ```bash
 docker-compose up
@@ -53,19 +58,28 @@ curl -i -X GET \
 * You can see minio S3 buckets status
 ![Mimir minio UI](http://imageresizer-dev-serverlessdeploymentbucket-xapz1q6q9exe.s3-website-ap-northeast-1.amazonaws.com/gitpng/mimir_minio.PNG)
 
+### Loki
+* Loki is collecting logs from docker logging driver and helps grafana visualize
+* You can check the loki operation at http://localhost:3100/metrics
+
 ### prometheus
-* I added spring application metric path on prometheus.yml
-* prometheus is remote writing to Mimir distributor metric data in spring application.
+* Prometheus remotely writes collected metrics to Mimir Distributor Metrics data.
 
 ### grafana
 * You can use grafana ui at http://localhost:3000/
 * Enter account and password admin
-* When the grafana container starts up, it creates a prometheus datasource by reading datasources1.yml
+* When the grafana container starts up, it creates a prometheus datasource by reading datasources yml files
 
 ### observe the grafana dashboard UI
 
 * You can see spring application metric data sent by Mimir query-frontend and graphs
 ![Grafana Mimir UI](http://imageresizer-dev-serverlessdeploymentbucket-xapz1q6q9exe.s3-website-ap-northeast-1.amazonaws.com/gitpng/mimir_grafana_metric_2.PNG)
+
+* If you enter docker container name, You can see logs collected by Loki on grafana explore
+![Grafana Explore UI](http://imageresizer-dev-serverlessdeploymentbucket-xapz1q6q9exe.s3-website-ap-northeast-1.amazonaws.com/gitpng/mimir_grafana_logs_2.PNG)
+
+* You can see also logs on grafana explore dashboard
+![Grafana Loki UI](http://imageresizer-dev-serverlessdeploymentbucket-xapz1q6q9exe.s3-website-ap-northeast-1.amazonaws.com/gitpng/mimir_grafana_logs_1.PNG)
 
 ### Jaeger
 * Each Mimir MSA Service send data to Jaeger through Jaeger Agent
