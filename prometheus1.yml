@@ -14,7 +14,7 @@ scrape_configs:
       - targets: ['localhost:9090']
 
 remote_write:
-  - url: http://mimir_distributor:18180/api/v1/push
+  - url: http://mimir_distributor:8800/api/v1/push
     headers:
       X-Scope-OrgId: prom
     queue_config:

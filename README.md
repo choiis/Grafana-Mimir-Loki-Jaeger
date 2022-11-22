@@ -7,6 +7,8 @@
 
 ### Execution
 
+* Before running docker compose, open /consul/cortex.json file and change all address configurations to your local IP.
+
 ```bash
 docker-compose up
 ```
@@ -21,7 +23,7 @@ docker-compose up
 ![Mimir Admin UI](http://imageresizer-dev-serverlessdeploymentbucket-xapz1q6q9exe.s3-website-ap-northeast-1.amazonaws.com/gitpng/mimir_console.PNG)
 
 * You can check remote writing metric targets Mimir admin console at http://localhost:8800/distributor/all_user_stats
-![Mimir User UI](http://imageresizer-dev-serverlessdeploymentbucket-xapz1q6q9exe.s3-website-ap-northeast-1.amazonaws.com/gitpng/mimir_user.PNG)
+![Mimir User UI](http://imageresizer-dev-serverlessdeploymentbucket-xapz1q6q9exe.s3-website-ap-northeast-1.amazonaws.com/gitpng/mimir_user_stat_2.PNG)
 
 * You can view the configuration services of Mimir MSA at http://localhost:8800/memberlist
 ![Mimir member UI](http://imageresizer-dev-serverlessdeploymentbucket-xapz1q6q9exe.s3-website-ap-northeast-1.amazonaws.com/gitpng/mimir_components.PNG)
@@ -63,11 +65,11 @@ curl -i -X GET \
 ### observe the grafana dashboard UI
 
 * You can see spring application metric data sent by Mimir query-frontend and graphs
-![Grafana Mimir UI](https://imageresizer-dev-serverlessdeploymentbucket-xapz1q6q9exe.s3-website-ap-northeast-1.amazonaws.com/gitpng/mimir_grafana.PNG)
+![Grafana Mimir UI](http://imageresizer-dev-serverlessdeploymentbucket-xapz1q6q9exe.s3-website-ap-northeast-1.amazonaws.com/gitpng/mimir_grafana_metric_2.PNG)
 
 ### Jaeger
 * Each Mimir MSA Service send data to Jaeger through Jaeger Agent
 * You can search traces between Mimir MSA services at http://localhost:16686 
   
 * You can see the structure of calls between Mimir MSA services
-![MSA Call](http://imageresizer-dev-serverlessdeploymentbucket-xapz1q6q9exe.s3-website-ap-northeast-1.amazonaws.com/gitpng/mimir_jaeger-topology.PNG)
+![MSA Call](http://imageresizer-dev-serverlessdeploymentbucket-xapz1q6q9exe.s3-website-ap-northeast-1.amazonaws.com/gitpng/mimir_jaeger_topology_2.PNG)
