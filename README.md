@@ -1,9 +1,15 @@
-# Grafana Mimir MSA Docker
+# Observability Monitoring Grafana Mimir MSA & Loki & Jaeger 
+
+## Grafana Mimir MSA + Loki + Prometheus + Grafana metrics + Jaeger Trace example
 
 * Grafana Mimir is an open source, horizontally scalable, highly available, multi-tenant, long-term storage for Prometheus.
 * For information on Mimir, see the link below https://grafana.com/oss/mimir/
 
-## Grafana Mimir MSA + Prometheus + Grafana metrics + Jaeger Trace example
+* Jaeger is open source, end-to-end distributed tracing
+* For information on Jaeger, see the link below https://www.jaegertracing.io/
+
+* Loki is a log aggregation system designed to store and query logs from all your applications and infrastructure.
+* For information on Loki, see the link below https://grafana.com/oss/loki/
 
 ### Execution
 
@@ -78,7 +84,7 @@ curl -i -X GET \
 * If you enter docker container name, You can see logs collected by Loki on grafana explore
 ![Grafana Explore UI](http://imageresizer-dev-serverlessdeploymentbucket-xapz1q6q9exe.s3-website-ap-northeast-1.amazonaws.com/gitpng/mimir_grafana_logs_2.PNG)
 
-* You can see also logs on grafana explore dashboard
+* You can see also logs on grafana dashboard
 ![Grafana Loki UI](http://imageresizer-dev-serverlessdeploymentbucket-xapz1q6q9exe.s3-website-ap-northeast-1.amazonaws.com/gitpng/mimir_grafana_logs_1.PNG)
 
 ### Jaeger
