@@ -20,6 +20,8 @@
 docker plugin install grafana/loki-docker-driver:latest --alias loki --grant-all-permissions
 ```
 
+* execute docker-compose
+
 ```bash
 docker-compose up
 ```
