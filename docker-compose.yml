@@ -269,6 +269,7 @@ services:
       - "24000:24000"
     volumes: 
       - "./mimir.yml:/etc/mimir.yml"
+      - "/compactor-v:/data"
     command: "-target=compactor
             -config.file=/etc/mimir.yml 
             -server.http-listen-port=14000 
@@ -291,8 +292,10 @@ services:
       - "24100:24100"
     volumes: 
       - "./mimir.yml:/etc/mimir.yml"
+      - "store-v1:/tsdb"
     command: "-target=store-gateway
             -config.file=/etc/mimir.yml 
+            -store-gateway.sharding-ring.tokens-file-path=/tsdb 
             -server.http-listen-port=14100 
             -server.grpc-listen-port=24100"
     networks:
@@ -311,8 +314,10 @@ services:
       - "24200:24200"
     volumes: 
       - "./mimir.yml:/etc/mimir.yml"
+      - "store-v2:/tsdb"
     command: "-target=store-gateway
-            -config.file=/etc/mimir.yml 
+            -config.file=/etc/mimir.yml
+            -store-gateway.sharding-ring.tokens-file-path=/tsdb 
             -server.http-listen-port=14200 
             -server.grpc-listen-port=24200"
     networks:
@@ -423,6 +428,12 @@ volumes:
   ingester-v2:
     driver: local
   ingester-v3:
+    driver: local
+  compactor-v:
+    driver: local
+  store-v1:
+    driver: local
+  store-v2:
     driver: local
   prometheus_data-1:
     driver: local

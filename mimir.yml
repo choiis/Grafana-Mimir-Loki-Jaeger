@@ -117,3 +117,8 @@ store_gateway:
         kvstore:
             store: memberlist
         replication_factor: 2
+
+flusher:
+    exit_after_flush: true
+limits:
+    max_query_lookback: 1200s
