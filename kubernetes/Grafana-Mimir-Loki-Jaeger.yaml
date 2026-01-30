@@ -1,0 +1,1636 @@
+# ------------------------------------------------------------
+# Namespace
+# ------------------------------------------------------------
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mimir
+---
+# ------------------------------------------------------------
+# ConfigMaps
+# ------------------------------------------------------------
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mimir-config
+  namespace: mimir
+data:
+  mimir.yml: |
+    activity_tracker:
+      filepath: ./active-query-tracker
+    alertmanager:
+      data_dir: data/
+      enable_api: true
+    alertmanager_storage:
+      backend: s3
+      s3:
+        access_key_id: minioadmin
+        bucket_name: mimir-alert
+        endpoint: minio:9000
+        insecure: true
+        region: docker
+        secret_access_key: minioadmin
+    api:
+      prometheus_http_prefix: /api/prom
+    blocks_storage:
+      backend: s3
+      filesystem:
+        dir: ""
+      s3:
+        access_key_id: minioadmin
+        bucket_name: mimir-block-docker
+        endpoint: minio:9000
+        http:
+          max_idle_connections: 10
+          max_idle_connections_per_host: 5
+        insecure: true
+        region: docker
+        secret_access_key: minioadmin
+      tsdb:
+        block_ranges_period:
+          - 10m0s
+    compactor:
+      block_ranges:
+        - 10m0s
+      data_dir: ./data
+      sharding_ring:
+        kvstore:
+          store: memberlist
+    distributor:
+      ha_tracker:
+        enable_ha_tracker: false
+      pool:
+        client_cleanup_period: 15s
+        health_check_ingesters: true
+      ring:
+        kvstore:
+          store: memberlist
+    frontend:
+      cache_results: false
+      log_queries_longer_than: 4s
+    frontend_worker:
+      frontend_address: mimir-frontend:28800
+    ingester:
+      ring:
+        final_sleep: 5s
+        instance_interface_names:
+          - eth0
+        kvstore:
+          store: memberlist
+        num_tokens: 128
+        observe_period: 10s
+        replication_factor: 2
+        tokens_file_path: tokens
+        unregister_on_shutdown: false
+    ingester_client:
+      grpc_client_config:
+        max_recv_msg_size: 104857600
+        max_send_msg_size: 104857600
+    memberlist:
+      bind_addr:
+        - 0.0.0.0
+      bind_port: 7946
+      join_members:
+        - mimir-ingester-0.mimir-ingester-headless:7946
+        - mimir-ingester-1.mimir-ingester-headless:7946
+        - mimir-ingester-2.mimir-ingester-headless:7946
+      pull_push_interval: 10s
+      rejoin_interval: 5m0s
+    multitenancy_enabled: true
+    querier:
+      max_concurrent: 100
+    ruler:
+      alertmanager_url: http://mimir-alertmanager:15100/alertmanager
+      enable_api: true
+      evaluation_interval: 1m0s
+      poll_interval: 5m0s
+      resend_delay: 3h0m0s
+      ring:
+        instance_interface_names:
+          - eth0
+        kvstore:
+          store: memberlist
+        num_tokens: 64
+      rule_path: rules
+    ruler_storage:
+      backend: s3
+      filesystem:
+        dir: ""
+      s3:
+        access_key_id: minioadmin
+        bucket_name: mimir-block-ruler
+        endpoint: minio:9000
+        http:
+          max_idle_connections: 10
+          max_idle_connections_per_host: 5
+        insecure: true
+        region: docker
+        secret_access_key: minioadmin
+    server:
+      http_listen_port: 80
+    store_gateway:
+      sharding_ring:
+        kvstore:
+          store: memberlist
+        replication_factor: 2
+    flusher:
+      exit_after_flush: true
+    limits:
+      max_query_lookback: 1200s
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus1-config
+  namespace: mimir
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+    scrape_configs:
+      - job_name: 'prometheus'
+        scrape_interval: 10s
+        static_configs:
+          - targets: ['localhost:9090']
+    remote_write:
+      - url: http://mimir-distributor:8800/api/v1/push
+        headers:
+          X-Scope-OrgId: prom
+        queue_config:
+          capacity: 5000
+          max_shards: 20
+          min_shards: 5
+          max_samples_per_send: 1000
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus2-config
+  namespace: mimir
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+    scrape_configs:
+      - job_name: 'prometheus'
+        scrape_interval: 10s
+        consul_sd_configs:
+        - server: 'consul:8500'
+          tags:
+          - 'mimir'
+    remote_write:
+      - url: http://mimir-distributor:8800/api/v1/push
+        headers:
+          X-Scope-OrgId: mimir
+        queue_config:
+          capacity: 5000
+          max_shards: 20
+          min_shards: 5
+          max_samples_per_send: 1000
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: mimir
+data:
+  datasources.yml: |
+    apiVersion: 1
+    datasources:
+      - name: Prom-Docker
+        type: prometheus
+        access: proxy
+        orgId: 1
+        url: http://mimir-frontend:8880/api/prom
+        isDefault: false
+        version: 1
+        editable: true
+        jsonData:
+          httpHeaderName1: 'X-Scope-OrgId'
+        secureJsonData:
+          httpHeaderValue1: 'prom'
+      - name: Mimir-Docker
+        type: prometheus
+        access: proxy
+        orgId: 1
+        url: http://mimir-frontend:8880/api/prom
+        isDefault: true
+        version: 1
+        editable: true
+        jsonData:
+          httpHeaderName1: 'X-Scope-OrgId'
+        secureJsonData:
+          httpHeaderValue1: 'mimir'
+      - name: Loki
+        type: loki
+        access: proxy
+        url: http://loki:3100
+        jsonData:
+          maxLines: 1500
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: consul-config
+  namespace: mimir
+data:
+  consul_server.json: |
+    {
+      "server": true,
+      "bootstrap_expect": 1,
+      "client_addr": "0.0.0.0",
+      "ui_config": {
+        "enabled": true
+      },
+      "telemetry": {
+        "disable_compat_1.9": true,
+        "prometheus_retention_time": "2m"
+      }
+    }
+  mimir.json: |
+    {
+      "services": [{
+        "name": "distributor",
+        "tags": ["mimir", "distributor"],
+        "port": 8800,
+        "address": "mimir-distributor",
+        "check": {
+          "name": "Distributor Ready",
+          "http": "http://mimir-distributor:8800/ready",
+          "interval": "5s",
+          "timeout": "2s"
+        }
+      }, {
+        "name": "query-frontend",
+        "tags": ["mimir", "query-frontend"],
+        "port": 8880,
+        "address": "mimir-frontend",
+        "check": {
+          "name": "Query-Frontend Ready",
+          "http": "http://mimir-frontend:8880/ready",
+          "interval": "5s",
+          "timeout": "2s"
+        }
+      }, {
+        "id": "compactor-0",
+        "name": "compactor",
+        "tags": ["mimir", "compactor"],
+        "port": 14000,
+        "address": "mimir-compactor-0.mimir-compactor-headless",
+        "check": {
+          "name": "Compactor-0 Ready",
+          "http": "http://mimir-compactor-0.mimir-compactor-headless:14000/ready",
+          "interval": "5s",
+          "timeout": "3s"
+        }
+      }, {
+        "id": "compactor-1",
+        "name": "compactor",
+        "tags": ["mimir", "compactor"],
+        "port": 14000,
+        "address": "mimir-compactor-1.mimir-compactor-headless",
+        "check": {
+          "name": "Compactor-1 Ready",
+          "http": "http://mimir-compactor-1.mimir-compactor-headless:14000/ready",
+          "interval": "5s",
+          "timeout": "3s"
+        }
+      }, {
+        "id": "compactor-2",
+        "name": "compactor",
+        "tags": ["mimir", "compactor"],
+        "port": 14000,
+        "address": "mimir-compactor-2.mimir-compactor-headless",
+        "check": {
+          "name": "Compactor-2 Ready",
+          "http": "http://mimir-compactor-2.mimir-compactor-headless:14000/ready",
+          "interval": "5s",
+          "timeout": "3s"
+        }
+      }, {
+        "name": "ruler",
+        "tags": ["mimir", "ruler"],
+        "port": 15000,
+        "address": "mimir-ruler",
+        "check": {
+          "name": "ruler Ready",
+          "http": "http://mimir-ruler:15000/ready",
+          "interval": "5s",
+          "timeout": "3s"
+        }
+      }, {
+        "name": "alertmanager",
+        "tags": ["mimir", "alertmanager"],
+        "port": 15100,
+        "address": "mimir-alertmanager",
+        "check": {
+          "name": "alertmanager Ready",
+          "http": "http://mimir-alertmanager:15100/ready",
+          "interval": "5s",
+          "timeout": "3s"
+        }
+      }]
+    }
+---
+# ------------------------------------------------------------
+# PersistentVolumeClaims
+# ------------------------------------------------------------
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: minio-pvc
+  namespace: mimir
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prometheus1-pvc
+  namespace: mimir
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prometheus2-pvc
+  namespace: mimir
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-pvc
+  namespace: mimir
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
+# ------------------------------------------------------------
+# MinIO (LoadBalancer)
+# ------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio
+  namespace: mimir
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minio
+  template:
+    metadata:
+      labels:
+        app: minio
+    spec:
+      containers:
+        - name: minio
+          image: minio/minio:RELEASE.2021-07-15T22-27-34Z
+          args:
+            - server
+            - /data
+            - --console-address
+            - ":9001"
+          ports:
+            - containerPort: 9000
+              name: api
+            - containerPort: 9001
+              name: console
+          volumeMounts:
+            - name: minio-storage
+              mountPath: /data
+          env:
+            - name: MINIO_ROOT_USER
+              value: "minioadmin"
+            - name: MINIO_ROOT_PASSWORD
+              value: "minioadmin"
+      volumes:
+        - name: minio-storage
+          persistentVolumeClaim:
+            claimName: minio-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+  namespace: mimir
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 9000
+      targetPort: 9000
+      name: api
+    - port: 9001
+      targetPort: 9001
+      name: console
+  selector:
+    app: minio
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-create-buckets
+  namespace: mimir
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+        - name: wait-for-minio
+          image: busybox:1.35
+          command: ['sh', '-c', 'until nc -z minio 9000; do echo waiting for minio; sleep 2; done;']
+      containers:
+        - name: mc
+          image: minio/mc
+          command:
+            - /bin/sh
+            - -c
+            - |
+              /usr/bin/mc alias set myminio http://minio:9000 minioadmin minioadmin;
+              /usr/bin/mc mb myminio/mimir-block-docker --ignore-existing;
+              /usr/bin/mc policy set public myminio/mimir-block-docker;
+              /usr/bin/mc mb myminio/mimir-block-ruler --ignore-existing;
+              /usr/bin/mc policy set public myminio/mimir-block-ruler;
+              /usr/bin/mc mb myminio/mimir-alert --ignore-existing;
+              /usr/bin/mc policy set public myminio/mimir-alert;
+              echo "Buckets created successfully";
+---
+# ------------------------------------------------------------
+# Consul (LoadBalancer)
+# ------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: consul
+  namespace: mimir
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: consul
+  template:
+    metadata:
+      labels:
+        app: consul
+    spec:
+      containers:
+        - name: consul
+          image: consul:1.11
+          args:
+            - agent
+            - -server
+            - -bootstrap
+            - -ui
+            - -config-dir=/opt/
+            - --bind=0.0.0.0
+            - --client=0.0.0.0
+          ports:
+            - containerPort: 8500
+              name: http
+            - containerPort: 8600
+              name: dns-udp
+              protocol: UDP
+            - containerPort: 8300
+              name: server
+            - containerPort: 8301
+              name: serf-lan
+            - containerPort: 8302
+              name: serf-wan
+          volumeMounts:
+            - name: consul-config
+              mountPath: /opt/
+      volumes:
+        - name: consul-config
+          configMap:
+            name: consul-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: consul
+  namespace: mimir
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 8500
+      targetPort: 8500
+      name: http
+    - port: 8600
+      targetPort: 8600
+      protocol: UDP
+      name: dns-udp
+    - port: 8300
+      targetPort: 8300
+      name: server
+    - port: 8301
+      targetPort: 8301
+      name: serf-lan
+    - port: 8302
+      targetPort: 8302
+      name: serf-wan
+  selector:
+    app: consul
+---
+# ------------------------------------------------------------
+# Jaeger (LoadBalancer)
+# ------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger
+  namespace: mimir
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jaeger
+  template:
+    metadata:
+      labels:
+        app: jaeger
+    spec:
+      containers:
+        - name: jaeger
+          image: jaegertracing/all-in-one:1.33
+          env:
+            - name: COLLECTOR_ZIPKIN_HOST_PORT
+              value: "9411"
+          ports:
+            - containerPort: 16686
+              name: ui
+            - containerPort: 9411
+              name: zipkin
+            - containerPort: 14268
+              name: collector-http
+            - containerPort: 14250
+              name: collector-grpc
+            - containerPort: 6831
+              protocol: UDP
+              name: agent-compact
+            - containerPort: 6832
+              protocol: UDP
+              name: agent-binary
+            - containerPort: 5778
+              name: agent-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger
+  namespace: mimir
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 16686
+      targetPort: 16686
+      name: ui
+    - port: 9411
+      targetPort: 9411
+      name: zipkin
+    - port: 14268
+      targetPort: 14268
+      name: collector-http
+    - port: 14250
+      targetPort: 14250
+      name: collector-grpc
+  selector:
+    app: jaeger
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-agent-svc
+  namespace: mimir
+spec:
+  type: ClusterIP
+  ports:
+    - port: 6831
+      targetPort: 6831
+      protocol: UDP
+      name: agent-compact
+    - port: 6832
+      targetPort: 6832
+      protocol: UDP
+      name: agent-binary
+    - port: 5778
+      targetPort: 5778
+      name: agent-config
+  selector:
+    app: jaeger
+---
+# ------------------------------------------------------------
+# Loki
+# ------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loki
+  namespace: mimir
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: loki
+  template:
+    metadata:
+      labels:
+        app: loki
+    spec:
+      containers:
+        - name: loki
+          image: grafana/loki:2.2.1
+          args:
+            - -config.file=/etc/loki/local-config.yaml
+          ports:
+            - containerPort: 3100
+              name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: loki
+  namespace: mimir
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3100
+      targetPort: 3100
+      name: http
+  selector:
+    app: loki
+---
+# ------------------------------------------------------------
+# Mimir Distributor (LoadBalancer)
+# ------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mimir-distributor
+  namespace: mimir
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mimir-distributor
+  template:
+    metadata:
+      labels:
+        app: mimir-distributor
+        mimir-component: distributor
+    spec:
+      containers:
+        - name: mimir-distributor
+          image: grafana/mimir:2.3.1
+          args:
+            - -target=distributor
+            - -config.file=/etc/mimir.yml
+            - -server.http-listen-port=8800
+            - -server.grpc-listen-port=9900
+          ports:
+            - containerPort: 8800
+              name: http
+            - containerPort: 9900
+              name: grpc
+            - containerPort: 7946
+              name: memberlist
+          env:
+            - name: JAEGER_AGENT_HOST
+              value: jaeger-agent-svc
+            - name: JAEGER_AGENT_PORT
+              value: "6831"
+          volumeMounts:
+            - name: mimir-config
+              mountPath: /etc/mimir.yml
+              subPath: mimir.yml
+      volumes:
+        - name: mimir-config
+          configMap:
+            name: mimir-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mimir-distributor
+  namespace: mimir
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 8800
+      targetPort: 8800
+      name: http
+    - port: 9900
+      targetPort: 9900
+      name: grpc
+  selector:
+    app: mimir-distributor
+---
+# ------------------------------------------------------------
+# Mimir Ingester (StatefulSet)
+# ------------------------------------------------------------
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mimir-ingester
+  namespace: mimir
+spec:
+  serviceName: mimir-ingester-headless
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mimir-ingester
+  template:
+    metadata:
+      labels:
+        app: mimir-ingester
+        mimir-component: ingester
+    spec:
+      containers:
+        - name: mimir-ingester
+          image: grafana/mimir:2.3.1
+          args:
+            - -target=ingester
+            - -config.file=/etc/mimir.yml
+            - -server.http-listen-port=13100
+            - -server.grpc-listen-port=23100
+            - -memberlist.bind-port=7946
+          ports:
+            - containerPort: 13100
+              name: http
+            - containerPort: 23100
+              name: grpc
+            - containerPort: 7946
+              name: memberlist
+          env:
+            - name: JAEGER_AGENT_HOST
+              value: jaeger-agent-svc
+            - name: JAEGER_AGENT_PORT
+              value: "6831"
+          volumeMounts:
+            - name: mimir-config
+              mountPath: /etc/mimir.yml
+              subPath: mimir.yml
+            - name: tsdb-storage
+              mountPath: /tsdb
+      volumes:
+        - name: mimir-config
+          configMap:
+            name: mimir-config
+  volumeClaimTemplates:
+    - metadata:
+        name: tsdb-storage
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mimir-ingester-headless
+  namespace: mimir
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - port: 13100
+      targetPort: 13100
+      name: http
+    - port: 23100
+      targetPort: 23100
+      name: grpc
+    - port: 7946
+      targetPort: 7946
+      name: memberlist
+  selector:
+    app: mimir-ingester
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mimir-ingester
+  namespace: mimir
+spec:
+  type: ClusterIP
+  ports:
+    - port: 13100
+      targetPort: 13100
+      name: http
+    - port: 23100
+      targetPort: 23100
+      name: grpc
+  selector:
+    app: mimir-ingester
+---
+# ------------------------------------------------------------
+# Mimir Store Gateway (StatefulSet)
+# ------------------------------------------------------------
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mimir-store-gateway
+  namespace: mimir
+spec:
+  serviceName: mimir-store-gateway-headless
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mimir-store-gateway
+  template:
+    metadata:
+      labels:
+        app: mimir-store-gateway
+        mimir-component: store-gateway
+    spec:
+      containers:
+        - name: mimir-store-gateway
+          image: grafana/mimir:2.3.1
+          args:
+            - -target=store-gateway
+            - -config.file=/etc/mimir.yml
+            - -store-gateway.sharding-ring.tokens-file-path=/tsdb/tokens
+            - -server.http-listen-port=14100
+            - -server.grpc-listen-port=24100
+          ports:
+            - containerPort: 14100
+              name: http
+            - containerPort: 24100
+              name: grpc
+            - containerPort: 7946
+              name: memberlist
+          env:
+            - name: JAEGER_AGENT_HOST
+              value: jaeger-agent-svc
+            - name: JAEGER_AGENT_PORT
+              value: "6831"
+          volumeMounts:
+            - name: mimir-config
+              mountPath: /etc/mimir.yml
+              subPath: mimir.yml
+            - name: tsdb-storage
+              mountPath: /tsdb
+      volumes:
+        - name: mimir-config
+          configMap:
+            name: mimir-config
+  volumeClaimTemplates:
+    - metadata:
+        name: tsdb-storage
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mimir-store-gateway-headless
+  namespace: mimir
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - port: 14100
+      targetPort: 14100
+      name: http
+    - port: 24100
+      targetPort: 24100
+      name: grpc
+    - port: 7946
+      targetPort: 7946
+      name: memberlist
+  selector:
+    app: mimir-store-gateway
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mimir-store-gateway
+  namespace: mimir
+spec:
+  type: ClusterIP
+  ports:
+    - port: 14100
+      targetPort: 14100
+      name: http
+    - port: 24100
+      targetPort: 24100
+      name: grpc
+  selector:
+    app: mimir-store-gateway
+---
+# ------------------------------------------------------------
+# Mimir Querier
+# ------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mimir-querier
+  namespace: mimir
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mimir-querier
+  template:
+    metadata:
+      labels:
+        app: mimir-querier
+        mimir-component: querier
+    spec:
+      initContainers:
+        - name: wait-for-frontend
+          image: busybox:1.35
+          command: ['sh', '-c', 'until nc -z mimir-frontend-headless 28800; do echo waiting for mimir-frontend; sleep 2; done;']
+      containers:
+        - name: mimir-querier
+          image: grafana/mimir:2.3.1
+          args:
+            - -target=querier
+            - -config.file=/etc/mimir.yml
+            - -server.http-listen-port=11221
+            - -server.grpc-listen-port=21221
+          ports:
+            - containerPort: 11221
+              name: http
+            - containerPort: 21221
+              name: grpc
+            - containerPort: 7946
+              name: memberlist
+          env:
+            - name: JAEGER_AGENT_HOST
+              value: jaeger-agent-svc
+            - name: JAEGER_AGENT_PORT
+              value: "6831"
+          volumeMounts:
+            - name: mimir-config
+              mountPath: /etc/mimir.yml
+              subPath: mimir.yml
+      volumes:
+        - name: mimir-config
+          configMap:
+            name: mimir-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mimir-querier
+  namespace: mimir
+spec:
+  type: ClusterIP
+  ports:
+    - port: 11221
+      targetPort: 11221
+      name: http
+    - port: 21221
+      targetPort: 21221
+      name: grpc
+  selector:
+    app: mimir-querier
+---
+# ------------------------------------------------------------
+# Mimir Query Frontend (LoadBalancer)
+# ------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mimir-frontend
+  namespace: mimir
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mimir-frontend
+  template:
+    metadata:
+      labels:
+        app: mimir-frontend
+        mimir-component: query-frontend
+    spec:
+      containers:
+        - name: mimir-frontend
+          image: grafana/mimir:2.3.1
+          args:
+            - -target=query-frontend
+            - -config.file=/etc/mimir.yml
+            - -server.http-listen-port=8880
+            - -server.grpc-listen-port=28800
+          ports:
+            - containerPort: 8880
+              name: http
+            - containerPort: 28800
+              name: grpc
+          env:
+            - name: JAEGER_AGENT_HOST
+              value: jaeger-agent-svc
+            - name: JAEGER_AGENT_PORT
+              value: "6831"
+          volumeMounts:
+            - name: mimir-config
+              mountPath: /etc/mimir.yml
+              subPath: mimir.yml
+      volumes:
+        - name: mimir-config
+          configMap:
+            name: mimir-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mimir-frontend-headless
+  namespace: mimir
+spec:
+  type: ClusterIP
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+    - port: 8880
+      targetPort: 8880
+      name: http
+    - port: 28800
+      targetPort: 28800
+      name: grpc
+  selector:
+    app: mimir-frontend
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mimir-frontend
+  namespace: mimir
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 8880
+      targetPort: 8880
+      name: http
+    - port: 28800
+      targetPort: 28800
+      name: grpc
+  selector:
+    app: mimir-frontend
+---
+# ------------------------------------------------------------
+# Mimir Compactor (StatefulSet x3)
+# ------------------------------------------------------------
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mimir-compactor
+  namespace: mimir
+spec:
+  serviceName: mimir-compactor-headless
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mimir-compactor
+  template:
+    metadata:
+      labels:
+        app: mimir-compactor
+        mimir-component: compactor
+    spec:
+      containers:
+        - name: mimir-compactor
+          image: grafana/mimir:2.3.1
+          args:
+            - -target=compactor
+            - -config.file=/etc/mimir.yml
+            - -server.http-listen-port=14000
+            - -server.grpc-listen-port=24000
+          ports:
+            - containerPort: 14000
+              name: http
+            - containerPort: 24000
+              name: grpc
+            - containerPort: 7946
+              name: memberlist
+          env:
+            - name: JAEGER_AGENT_HOST
+              value: jaeger-agent-svc
+            - name: JAEGER_AGENT_PORT
+              value: "6831"
+          volumeMounts:
+            - name: mimir-config
+              mountPath: /etc/mimir.yml
+              subPath: mimir.yml
+            - name: compactor-data
+              mountPath: /data
+      volumes:
+        - name: mimir-config
+          configMap:
+            name: mimir-config
+  volumeClaimTemplates:
+    - metadata:
+        name: compactor-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mimir-compactor-headless
+  namespace: mimir
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - port: 14000
+      targetPort: 14000
+      name: http
+    - port: 24000
+      targetPort: 24000
+      name: grpc
+    - port: 7946
+      targetPort: 7946
+      name: memberlist
+  selector:
+    app: mimir-compactor
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mimir-compactor
+  namespace: mimir
+spec:
+  type: ClusterIP
+  ports:
+    - port: 14000
+      targetPort: 14000
+      name: http
+    - port: 24000
+      targetPort: 24000
+      name: grpc
+  selector:
+    app: mimir-compactor
+---
+# ------------------------------------------------------------
+# Mimir Ruler
+# ------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mimir-ruler
+  namespace: mimir
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mimir-ruler
+  template:
+    metadata:
+      labels:
+        app: mimir-ruler
+        mimir-component: ruler
+    spec:
+      containers:
+        - name: mimir-ruler
+          image: grafana/mimir:2.3.1
+          args:
+            - -target=ruler
+            - -config.file=/etc/mimir.yml
+            - -server.http-listen-port=15000
+            - -server.grpc-listen-port=25000
+          ports:
+            - containerPort: 15000
+              name: http
+            - containerPort: 25000
+              name: grpc
+            - containerPort: 7946
+              name: memberlist
+          env:
+            - name: JAEGER_AGENT_HOST
+              value: jaeger-agent-svc
+            - name: JAEGER_AGENT_PORT
+              value: "6831"
+          volumeMounts:
+            - name: mimir-config
+              mountPath: /etc/mimir.yml
+              subPath: mimir.yml
+      volumes:
+        - name: mimir-config
+          configMap:
+            name: mimir-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mimir-ruler
+  namespace: mimir
+spec:
+  type: ClusterIP
+  ports:
+    - port: 15000
+      targetPort: 15000
+      name: http
+    - port: 25000
+      targetPort: 25000
+      name: grpc
+  selector:
+    app: mimir-ruler
+---
+# ------------------------------------------------------------
+# Mimir Alertmanager
+# ------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mimir-alertmanager
+  namespace: mimir
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mimir-alertmanager
+  template:
+    metadata:
+      labels:
+        app: mimir-alertmanager
+        mimir-component: alertmanager
+    spec:
+      containers:
+        - name: mimir-alertmanager
+          image: grafana/mimir:2.3.1
+          args:
+            - -target=alertmanager
+            - -config.file=/etc/mimir.yml
+            - -server.http-listen-port=15100
+            - -server.grpc-listen-port=25100
+            - -alertmanager.web.external-url=http://mimir-alertmanager:15100/alertmanager
+          ports:
+            - containerPort: 15100
+              name: http
+            - containerPort: 25100
+              name: grpc
+          env:
+            - name: JAEGER_AGENT_HOST
+              value: jaeger-agent-svc
+            - name: JAEGER_AGENT_PORT
+              value: "6831"
+          volumeMounts:
+            - name: mimir-config
+              mountPath: /etc/mimir.yml
+              subPath: mimir.yml
+      volumes:
+        - name: mimir-config
+          configMap:
+            name: mimir-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mimir-alertmanager
+  namespace: mimir
+spec:
+  type: ClusterIP
+  ports:
+    - port: 15100
+      targetPort: 15100
+      name: http
+    - port: 25100
+      targetPort: 25100
+      name: grpc
+  selector:
+    app: mimir-alertmanager
+---
+# ------------------------------------------------------------
+# Prometheus 1
+# ------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus-1
+  namespace: mimir
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus-1
+  template:
+    metadata:
+      labels:
+        app: prometheus-1
+    spec:
+      containers:
+        - name: prometheus
+          image: prom/prometheus:v2.33.1
+          args:
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --storage.tsdb.path=/prometheus
+          ports:
+            - containerPort: 9090
+              name: http
+          volumeMounts:
+            - name: prometheus-config
+              mountPath: /etc/prometheus
+            - name: prometheus-storage
+              mountPath: /prometheus
+      volumes:
+        - name: prometheus-config
+          configMap:
+            name: prometheus1-config
+        - name: prometheus-storage
+          persistentVolumeClaim:
+            claimName: prometheus1-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-1
+  namespace: mimir
+spec:
+  type: ClusterIP
+  ports:
+    - port: 9090
+      targetPort: 9090
+      name: http
+  selector:
+    app: prometheus-1
+---
+# ------------------------------------------------------------
+# Prometheus 2
+# ------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus-2
+  namespace: mimir
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus-2
+  template:
+    metadata:
+      labels:
+        app: prometheus-2
+    spec:
+      containers:
+        - name: prometheus
+          image: prom/prometheus:v2.33.1
+          args:
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --storage.tsdb.path=/prometheus
+          ports:
+            - containerPort: 9090
+              name: http
+          volumeMounts:
+            - name: prometheus-config
+              mountPath: /etc/prometheus
+            - name: prometheus-storage
+              mountPath: /prometheus
+      volumes:
+        - name: prometheus-config
+          configMap:
+            name: prometheus2-config
+        - name: prometheus-storage
+          persistentVolumeClaim:
+            claimName: prometheus2-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-2
+  namespace: mimir
+spec:
+  type: ClusterIP
+  ports:
+    - port: 9090
+      targetPort: 9090
+      name: http
+  selector:
+    app: prometheus-2
+---
+# ------------------------------------------------------------
+# Grafana (LoadBalancer)
+# ------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: mimir
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      securityContext:
+        fsGroup: 472
+        supplementalGroups:
+          - 0
+      containers:
+        - name: grafana
+          image: grafana/grafana:8.0.2
+          ports:
+            - containerPort: 3000
+              name: http
+          env:
+            - name: GF_SECURITY_ADMIN_USER
+              value: "admin"
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              value: "admin"
+          volumeMounts:
+            - name: grafana-storage
+              mountPath: /var/lib/grafana
+            - name: grafana-datasources
+              mountPath: /etc/grafana/provisioning/datasources
+      volumes:
+        - name: grafana-storage
+          persistentVolumeClaim:
+            claimName: grafana-pvc
+        - name: grafana-datasources
+          configMap:
+            name: grafana-datasources
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: mimir
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 3000
+      targetPort: 3000
+      name: http
+  selector:
+    app: grafana
+---
+# ------------------------------------------------------------
+# Promtail - Log Collector for Loki
+# ------------------------------------------------------------
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: promtail
+  namespace: mimir
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: promtail
+rules:
+  - apiGroups: [""]
+    resources:
+      - nodes
+      - nodes/proxy
+      - services
+      - endpoints
+      - pods
+    verbs: ["get", "watch", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: promtail
+subjects:
+  - kind: ServiceAccount
+    name: promtail
+    namespace: mimir
+roleRef:
+  kind: ClusterRole
+  name: promtail
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: promtail-config
+  namespace: mimir
+data:
+  promtail.yaml: |
+    server:
+      http_listen_port: 9080
+      grpc_listen_port: 0
+
+    positions:
+      filename: /tmp/positions.yaml
+
+    clients:
+      - url: http://loki:3100/loki/api/v1/push
+
+    scrape_configs:
+      - job_name: kubernetes-pods
+        pipeline_stages:
+          - cri: {}
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          # Only scrape pods in mimir namespace
+          - source_labels: [__meta_kubernetes_namespace]
+            action: keep
+            regex: mimir
+          # Set namespace label
+          - source_labels: [__meta_kubernetes_namespace]
+            action: replace
+            target_label: namespace
+          # Set pod name label
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: pod
+          # Set container name label
+          - source_labels: [__meta_kubernetes_pod_container_name]
+            action: replace
+            target_label: container
+          # Set app label from pod label
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: replace
+            target_label: app
+          # Set job label to app name
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: replace
+            target_label: job
+          # Set mimir component label
+          - source_labels: [__meta_kubernetes_pod_label_mimir_component]
+            action: replace
+            target_label: mimir_component
+          # Use container name and pod name for log file path
+          - replacement: /var/log/pods/*$1/*.log
+            separator: /
+            source_labels:
+              - __meta_kubernetes_pod_uid
+              - __meta_kubernetes_pod_container_name
+            target_label: __path__
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: promtail
+  namespace: mimir
+spec:
+  selector:
+    matchLabels:
+      app: promtail
+  template:
+    metadata:
+      labels:
+        app: promtail
+    spec:
+      serviceAccountName: promtail
+      containers:
+        - name: promtail
+          image: grafana/promtail:2.2.1
+          args:
+            - -config.file=/etc/promtail/promtail.yaml
+          ports:
+            - containerPort: 9080
+              name: http
+          volumeMounts:
+            - name: promtail-config
+              mountPath: /etc/promtail
+            - name: varlog
+              mountPath: /var/log
+              readOnly: true
+            - name: varlibdockercontainers
+              mountPath: /var/lib/docker/containers
+              readOnly: true
+            - name: varlogpods
+              mountPath: /var/log/pods
+              readOnly: true
+          env:
+            - name: HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+      volumes:
+        - name: promtail-config
+          configMap:
+            name: promtail-config
+        - name: varlog
+          hostPath:
+            path: /var/log
+        - name: varlibdockercontainers
+          hostPath:
+            path: /var/lib/docker/containers
+        - name: varlogpods
+          hostPath:
+            path: /var/log/pods
